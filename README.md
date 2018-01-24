@@ -1,3 +1,4 @@
+CycleGAN with WGAN-GP
 ## Prerequisites
 - Linux or macOS
 - Python 2 or 3
