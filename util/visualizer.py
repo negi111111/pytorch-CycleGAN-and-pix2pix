@@ -4,7 +4,6 @@ import ntpath
 import time
 from . import util
 from . import html
-from scipy.misc import imresize
 
 
 class Visualizer():
@@ -124,7 +123,7 @@ class Visualizer():
             log_file.write('%s\n' % message)
 
     # save image to the disk
-    def save_images(self, webpage, visuals, image_path, aspect_ratio=1.0):
+    def save_images(self, webpage, visuals, image_path):
         image_dir = webpage.get_image_dir()
         short_path = ntpath.basename(image_path[0])
         name = os.path.splitext(short_path)[0]
@@ -134,15 +133,10 @@ class Visualizer():
         txts = []
         links = []
 
-        for label, im in visuals.items():
+        for label, image_numpy in visuals.items():
             image_name = '%s_%s.png' % (name, label)
             save_path = os.path.join(image_dir, image_name)
-            h, w, _ = im.shape
-            if aspect_ratio > 1.0:
-                im = imresize(im, (h, int(w * aspect_ratio)), interp='bicubic')
-            if aspect_ratio < 1.0:
-                im = imresize(im, (int(h / aspect_ratio), w), interp='bicubic')
-            util.save_image(im, save_path)
+            util.save_image(image_numpy, save_path)
 
             ims.append(image_name)
             txts.append(label)

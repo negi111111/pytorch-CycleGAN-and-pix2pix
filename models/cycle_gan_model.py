@@ -3,6 +3,7 @@ import torch
 import os
 from collections import OrderedDict
 from torch.autograd import Variable
+from torch.autograd import grad
 import itertools
 import util.util as util
 from util.image_pool import ImagePool
@@ -20,6 +21,8 @@ class CycleGANModel(BaseModel):
 
         nb = opt.batchSize
         size = opt.fineSize
+        self.input_A = self.Tensor(nb, opt.input_nc, size, size)
+        self.input_B = self.Tensor(nb, opt.output_nc, size, size)
 
         # load/define networks
         # The naming conversion is different from those used in the paper
@@ -55,10 +58,9 @@ class CycleGANModel(BaseModel):
             self.criterionCycle = torch.nn.L1Loss()
             self.criterionIdt = torch.nn.L1Loss()
             # initialize optimizers
-            self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG_A.parameters(), self.netG_B.parameters()),
-                                                lr=opt.lr, betas=(opt.beta1, 0.999))
-            self.optimizer_D_A = torch.optim.Adam(self.netD_A.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-            self.optimizer_D_B = torch.optim.Adam(self.netD_B.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+            self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG_A.parameters(), self.netG_B.parameters()), lr=opt.lr, betas=(opt.beta1, 0.9))
+            self.optimizer_D_A = torch.optim.Adam(self.netD_A.parameters(), lr=opt.lr, betas=(opt.beta1, 0.9))
+            self.optimizer_D_B = torch.optim.Adam(self.netD_B.parameters(), lr=opt.lr, betas=(opt.beta1, 0.9))
             self.optimizers = []
             self.schedulers = []
             self.optimizers.append(self.optimizer_G)
@@ -79,11 +81,8 @@ class CycleGANModel(BaseModel):
         AtoB = self.opt.which_direction == 'AtoB'
         input_A = input['A' if AtoB else 'B']
         input_B = input['B' if AtoB else 'A']
-        if len(self.gpu_ids) > 0:
-            input_A = input_A.cuda(self.gpu_ids[0], async=True)
-            input_B = input_B.cuda(self.gpu_ids[0], async=True)
-        self.input_A = input_A
-        self.input_B = input_B
+        self.input_A.resize_(input_A.size()).copy_(input_A)
+        self.input_B.resize_(input_B.size()).copy_(input_B)
         self.image_paths = input['A_paths' if AtoB else 'B_paths']
 
     def forward(self):
@@ -108,12 +107,22 @@ class CycleGANModel(BaseModel):
     def backward_D_basic(self, netD, real, fake):
         # Real
         pred_real = netD(real)
-        loss_D_real = self.criterionGAN(pred_real, True)
+        loss_D_real = -torch.mean(pred_real)
         # Fake
         pred_fake = netD(fake.detach())
-        loss_D_fake = self.criterionGAN(pred_fake, False)
+        loss_D_fake = torch.mean(pred_fake)
+        # Gradient penalty
+        eps=Variable(torch.rand(1), requires_grad=True)
+        eps=eps.expand(real.size())
+        eps=eps.cuda()
+        x_tilde=eps*real+(1-eps)*fake.detach()
+        x_tilde=x_tilde.cuda()
+        pred_tilde=netD(x_tilde)
+        gradients = grad(outputs=pred_tilde, inputs=x_tilde,
+                              grad_outputs=torch.ones(pred_tilde.size()).cuda(),
+create_graph=True, retain_graph=True, only_inputs=True)[0]
         # Combined loss
-        loss_D = (loss_D_real + loss_D_fake) * 0.5
+        loss_D = loss_D_real + loss_D_fake + 10 * ((gradients.norm(2, dim=1) - 1) ** 2).mean()
         # backward
         loss_D.backward()
         return loss_D
@@ -154,12 +163,13 @@ class CycleGANModel(BaseModel):
         # GAN loss D_A(G_A(A))
         fake_B = self.netG_A(self.real_A)
         pred_fake = self.netD_A(fake_B)
-        loss_G_A = self.criterionGAN(pred_fake, True)
+        #pred_real=self.netD_A(self.real_B)
+        loss_G_A = -torch.mean(pred_fake)
 
         # GAN loss D_B(G_B(B))
         fake_A = self.netG_B(self.real_B)
         pred_fake = self.netD_B(fake_A)
-        loss_G_B = self.criterionGAN(pred_fake, True)
+        loss_G_B = -torch.mean(pred_fake)
 
         # Forward cycle loss
         rec_A = self.netG_B(fake_B)
@@ -190,13 +200,16 @@ class CycleGANModel(BaseModel):
         self.backward_G()
         self.optimizer_G.step()
         # D_A
-        self.optimizer_D_A.zero_grad()
-        self.backward_D_A()
-        self.optimizer_D_A.step()
+        for _ in range(5):
+            self.optimizer_D_A.zero_grad()
+            self.backward_D_A()
+            self.optimizer_D_A.step()
         # D_B
-        self.optimizer_D_B.zero_grad()
-        self.backward_D_B()
-        self.optimizer_D_B.step()
+        for _ in range(5):
+            self.optimizer_D_B.zero_grad()
+            self.backward_D_B()
+            self.optimizer_D_B.step()
+
 
     def get_current_errors(self):
         ret_errors = OrderedDict([('D_A', self.loss_D_A), ('G_A', self.loss_G_A), ('Cyc_A', self.loss_cycle_A),

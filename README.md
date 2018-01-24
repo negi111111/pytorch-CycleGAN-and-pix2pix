@@ -124,50 +124,31 @@ The test results will be saved to a html file here: `./results/facades_pix2pix/l
 More example scripts can be found at `scripts` directory.
 
 ### Apply a pre-trained model (CycleGAN)
-- You can download a pretrained model (e.g. horse2zebra) with the following script:
-```bash
-bash pretrained_models/download_cyclegan_model.sh horse2zebra
-```
-The pretrained model is saved at `./checkpoints/{name}_pretrained/latest_net_G.pth`.
-- To test the model, you also need to download the  horse2zebra dataset:
-```bash
-bash ./datasets/download_cyclegan_dataset.sh horse2zebra
-```
-
-- Then generate the results using
-```bash
-python test.py --dataroot datasets/horse2zebra/testA --checkpoints_dir ./checkpoints/ --name horse2zebra_pretrained --no_dropout --model test --dataset_mode single --loadSize 256
-```
-The results will be saved at `./results/`. Use `--results_dir {directory_path_to_save_result}` to specify the results directory.
-- Note: The models trained using Torch and PyTorch produce slightly different results, although we were not able to decide which result is better. If you would like to reproduce the same results in our paper, we recommend using the pretrained models in the Torch codebase.
-
-- If you would like to apply a pre-trained model to a collection of input images (rather than image pairs), please use `--dataset_mode single` and `--model test` options. Here is a script to apply a model to Facade label maps (stored in the directory `facades/testB`).
+If you would like to apply a pre-trained model to a collection of input photos (without image pairs), please use `--dataset_mode single` and `--model test` options. Here is a script to apply a model to Facade label maps (stored in the directory `facades/testB`).
 ``` bash
 #!./scripts/test_single.sh
-python test.py --dataroot ./datasets/facades/testB/ --name {your_trained_model_name} --model test --dataset_mode single
+python test.py --dataroot ./datasets/facades/testA/ --name {my_trained_model_name} --model test --dataset_mode single
 ```
+
 You might want to specify `--which_model_netG` to match the generator architecture of the trained model.
+
+Note: We currently don't have pretrained models using PyTorch. This is in part because the models trained using Torch and PyTorch produce slightly different results, although we were not able to decide which result is better. If you would like to generate the same results that appeared in our paper, we recommend using the pretrained models in the Torch codebase.
 
 ### Apply a pre-trained model (pix2pix)
 
-Download a pre-trained model with `./pretrained_models/download_pix2pix_model.sh`.
+Download the pre-trained models using `./pretrained_models/download_pix2pix_model.sh`. For example, if you would like to download label2photo model on the Facades dataset,
 
-- For example, if you would like to download label2photo model on the Facades dataset,
 ```bash
 bash pretrained_models/download_pix2pix_model.sh facades_label2photo
 ```
 
-- Download the pix2pix facades datasets
-```bash
-bash ./datasets/download_pix2pix_dataset.sh facades
-```
-- Then generate the results using
+Then generate the results using
 ```bash
 python test.py --dataroot ./datasets/facades/ --which_direction BtoA --model pix2pix --name facades_label2photo_pretrained --dataset_mode aligned --which_model_netG unet_256 --norm batch
 ```
-Note that we specified `--which_direction BtoA` as Facades dataset's A to B direction is photos to labels.
+Note that we specified `--which_direction BtoA` to accomodate the fact that the Facades dataset's A to B direction is photos to labels.
 
-- See a list of currently available models at `bash pretrained_models/download_pix2pix_model.sh`
+Also, the models that are currently available to download can be found by reading the output of `bash pretrained_models/download_pix2pix_model.sh`
 
 ## Training/test Details
 - Flags: see `options/train_options.py` and `options/base_options.py` for all the training flags; see `options/test_options.py` and `options/base_options.py` for all the test flags.
@@ -191,7 +172,7 @@ bash ./datasets/download_cyclegan_dataset.sh dataset_name
 - `monet2photo`, `vangogh2photo`, `ukiyoe2photo`, `cezanne2photo`: The art images were downloaded from [Wikiart](https://www.wikiart.org/). The real photos are downloaded from Flickr using the combination of the tags *landscape* and *landscapephotography*. The training set size of each class is Monet:1074, Cezanne:584, Van Gogh:401, Ukiyo-e:1433, Photographs:6853.
 - `iphone2dslr_flower`: both classes of images were downlaoded from Flickr. The training set size of each class is iPhone:1813, DSLR:3316. See more details in our paper.
 
-To train a model on your own datasets, you need to create a data folder with two subdirectories `trainA` and `trainB` that contain images from domain A and B. You can test your model on your training set by setting `--phase train` in `test.py`. You can also create subdirectories `testA` and `testB` if you have test data.
+To train a model on your own datasets, you need to create a data folder with two subdirectories `trainA` and `trainB` that contain images from domain A and B. You can test your model on your training set by setting ``phase='train'`` in  `test.lua`. You can also create subdirectories `testA` and `testB` if you have test data.
 
 You should **not** expect our method to work on just any random combination of input and output datasets (e.g. `cats<->keyboards`). From our experiments, we find it works better if two datasets share similar visual content. For example, `landscape painting<->landscape photographs` works much better than `portrait painting <-> landscape photographs`. `zebras<->horses` achieves compelling results while `cats<->dogs` completely fails.
 
