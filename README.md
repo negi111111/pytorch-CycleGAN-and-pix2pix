@@ -23,7 +23,7 @@ bash ./datasets/download_cyclegan_dataset.sh maps
 - Train a model:
 ```bash
 #!./scripts/train_cyclegan.sh
-python train.py --dataroot ./datasets/maps --name maps_cyclegan --model cycle_gan --no_dropout --batchSize 32 --gpu_ids 0,1 --checkpoints_dir --checkpoints_maps
+python train.py --dataroot ./datasets/maps --name maps_cyclegan --model cycle_gan --no_dropout --batchSize 32 --gpu_ids 0,1 --checkpoints_dir checkpoints/checkpoints_maps
 ```
 - To view training results and loss plots, run `python -m visdom.server` and click the URL http://localhost:8097. To see more intermediate results, check out `./checkpoints/maps_cyclegan/web/index.html`
 - Test the model:
